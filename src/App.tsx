@@ -1,11 +1,17 @@
 import { useMemo, useRef, useState } from "react";
 
 type RoutingMode = "single" | "priority" | "round-robin";
+type EnumerationStatus = "idle" | "enumerating" | "complete";
 
 const demoPrimary = "0xA3f9...1b72";
 const demoSecondaries = ["0x2B11...8fE2", "0x9C0d...44Aa", "lens/riverblue"];
 
 const normalizeIdentity = (value: string) => value.trim().replace(/\s+/g, " ");
+const identityKey = (value: string) => normalizeIdentity(value).toLowerCase();
+
+const connectedIdentityDirectory: Record<string, string[]> = {
+  [identityKey(demoPrimary)]: demoSecondaries,
+};
 
 const formatIdentity = (value: string) => {
   if (value.length <= 14) return value;
@@ -18,32 +24,80 @@ export default function App() {
   const [secondaryInput, setSecondaryInput] = useState("");
   const [secondaries, setSecondaries] = useState<string[]>([]);
   const [routingMode, setRoutingMode] = useState<RoutingMode>("single");
+  const [enumerationStatus, setEnumerationStatus] =
+    useState<EnumerationStatus>("idle");
   const [note, setNote] = useState("");
   const primaryInputRef = useRef<HTMLInputElement>(null);
+  const enumerationRunRef = useRef(0);
+
+  const connectedIdentities = useMemo(
+    () => [primary, ...secondaries].filter(Boolean),
+    [primary, secondaries],
+  );
 
   const unifiedInbox = useMemo(() => {
-    if (!primary) return "Connect a primary identity to view routing.";
+    if (!primary) return "Load a primary inbox to view routing.";
+    if (enumerationStatus === "enumerating") {
+      return `Enumerating identities connected to ${formatIdentity(primary)}.`;
+    }
     const total = secondaries.length + 1;
     return `${formatIdentity(primary)} receives ${total} identity${
       total === 1 ? "" : "ies"
     }.`;
-  }, [primary, secondaries]);
+  }, [enumerationStatus, primary, secondaries]);
+
+  const enumerationCopy = useMemo(() => {
+    if (!primary) return "Waiting for primary inbox.";
+    if (enumerationStatus === "enumerating") return "Enumerating identities.";
+    if (enumerationStatus === "complete") {
+      return `${connectedIdentities.length} connected identit${
+        connectedIdentities.length === 1 ? "y" : "ies"
+      } loaded.`;
+    }
+    return "Primary inbox ready to load.";
+  }, [connectedIdentities.length, enumerationStatus, primary]);
+
+  const enumerateConnectedIdentities = (target: string, instant = false) => {
+    const runId = enumerationRunRef.current + 1;
+    const delay = instant ? 0 : 650;
+
+    enumerationRunRef.current = runId;
+    setEnumerationStatus("enumerating");
+    setSecondaries([]);
+    setNote("Loading primary inbox and enumerating connected identities.");
+
+    window.setTimeout(() => {
+      if (enumerationRunRef.current !== runId) return;
+
+      const discovered = connectedIdentityDirectory[identityKey(target)] ?? [];
+
+      setSecondaries(discovered);
+      setEnumerationStatus("complete");
+      setNote(
+        discovered.length > 0
+          ? `Loaded ${discovered.length + 1} connected identities.`
+          : "Primary inbox loaded. No additional connected identities were discovered yet.",
+      );
+    }, delay);
+  };
 
   const handlePrimaryConnect = () => {
     const next = normalizeIdentity(primaryInput);
     if (!next) {
-      setNote("Add a primary identity before connecting.");
+      setNote("Add a primary identity before loading the inbox.");
       return;
     }
     setPrimary(next);
-    if (secondaries.includes(next)) {
-      setSecondaries((prev) => prev.filter((item) => item !== next));
-    }
-    setNote("Primary identity connected.");
+    enumerateConnectedIdentities(next);
   };
 
   const handleAddSecondary = () => {
     const next = normalizeIdentity(secondaryInput);
+    if (!primary) {
+      setNote("Load a primary inbox before adding connected identities.");
+      primaryInputRef.current?.focus();
+      return;
+    }
     if (!next) {
       setNote("Enter an additional identity to add.");
       return;
@@ -58,6 +112,7 @@ export default function App() {
     }
     setSecondaries((prev) => [next, ...prev]);
     setSecondaryInput("");
+    setEnumerationStatus("complete");
     setNote("Identity added to the unified inbox.");
   };
 
@@ -69,15 +124,16 @@ export default function App() {
   const handleDemo = () => {
     setPrimary(demoPrimary);
     setPrimaryInput(demoPrimary);
-    setSecondaries(demoSecondaries);
-    setNote("Loaded demo identities.");
+    enumerateConnectedIdentities(demoPrimary, true);
   };
 
   const handleReset = () => {
+    enumerationRunRef.current += 1;
     setPrimary("");
     setPrimaryInput("");
     setSecondaries([]);
     setSecondaryInput("");
+    setEnumerationStatus("idle");
     setNote("Cleared the workspace.");
   };
 
@@ -123,7 +179,7 @@ export default function App() {
             </p>
             <div className="hero-actions">
               <button className="primary" onClick={handleJumpToPrimary}>
-                Connect primary
+                Load primary
               </button>
               <button className="secondary" onClick={handleJumpToRouting}>
                 Review routing
@@ -142,12 +198,12 @@ export default function App() {
                 </p>
               </div>
               <div>
-                <p className="stat-label">Additional</p>
-                <p className="stat-value">{secondaries.length}</p>
+                <p className="stat-label">Connected</p>
+                <p className="stat-value">{connectedIdentities.length}</p>
               </div>
               <div>
-                <p className="stat-label">Mode</p>
-                <p className="stat-value">{routingMode}</p>
+                <p className="stat-label">Enumeration</p>
+                <p className="stat-value">{enumerationStatus}</p>
               </div>
             </div>
             {note ? <p className="note">{note}</p> : null}
@@ -161,14 +217,14 @@ export default function App() {
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Step 1</p>
-                <h3>Connect your primary identity</h3>
+                <h3>Load your primary inbox</h3>
               </div>
               <span className="badge">Inbox target</span>
             </div>
             <p className="muted">
-              This identity becomes the destination for all routed messages. You
-              can connect an XMTP address, ENS, Lens handle, or another resolvable
-              identity.
+              This identity becomes the destination for all routed messages.
+              Loading it also enumerates the identities already connected to the
+              inbox.
             </p>
             <div className="input-row">
               <input
@@ -179,17 +235,17 @@ export default function App() {
                 onChange={(event) => setPrimaryInput(event.target.value)}
               />
               <button className="primary" onClick={handlePrimaryConnect}>
-                Connect
+                Load inbox
               </button>
             </div>
             <div className="panel-foot">
               <div>
                 <p className="stat-label">Connected primary</p>
                 <p className="stat-value">
-                  {primary ? primary : "No primary connected yet"}
+                  {primary ? primary : "No primary inbox loaded yet"}
                 </p>
               </div>
-              <span className="chip">Encrypted routing</span>
+              <span className="chip">{enumerationCopy}</span>
             </div>
           </article>
 
@@ -197,13 +253,13 @@ export default function App() {
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Step 2</p>
-                <h3>Add secondary identities</h3>
+                <h3>Review connected identities</h3>
               </div>
               <span className="badge alt">Multi-identity</span>
             </div>
             <p className="muted">
-              Link every account you want to converge into the same inbox. Each
-              identity will route messages to your primary destination.
+              The primary inbox load pulls in discovered identities. Add any
+              identity that has not been discovered yet.
             </p>
             <div className="input-row">
               <input
@@ -217,8 +273,14 @@ export default function App() {
               </button>
             </div>
             <div className="pill-list">
-              {secondaries.length === 0 ? (
-                <p className="muted">No secondary identities yet.</p>
+              {enumerationStatus === "enumerating" ? (
+                <p className="muted">Enumerating connected identities...</p>
+              ) : secondaries.length === 0 ? (
+                <p className="muted">
+                  {primary
+                    ? "No additional connected identities discovered yet."
+                    : "Load a primary inbox to enumerate connected identities."}
+                </p>
               ) : (
                 secondaries.map((identity) => (
                   <div className="pill" key={identity}>
@@ -282,8 +344,8 @@ export default function App() {
             <p className="eyebrow">Live preview</p>
             <h3>Unified inbox routing table</h3>
             <p className="muted">
-              See how identities route into your primary inbox before you commit
-              the configuration to XMTP.
+              See every enumerated identity routing into your primary inbox
+              before you commit the configuration to XMTP.
             </p>
           </div>
           <div className="table">
@@ -292,22 +354,28 @@ export default function App() {
               <span>Routes to</span>
               <span>Status</span>
             </div>
-            {[primary, ...secondaries].filter(Boolean).length === 0 ? (
+            {connectedIdentities.length === 0 ? (
               <div className="table-row empty">
                 <span>-</span>
-                <span>Connect identities to preview routing.</span>
+                <span>Load a primary inbox to preview routing.</span>
                 <span>-</span>
               </div>
+            ) : enumerationStatus === "enumerating" ? (
+              <div className="table-row empty">
+                <span>{formatIdentity(primary)}</span>
+                <span>Enumerating connected identities...</span>
+                <span>Loading</span>
+              </div>
             ) : (
-              [primary, ...secondaries]
-                .filter(Boolean)
-                .map((identity, index) => (
-                  <div className="table-row" key={`${identity}-${index}`}>
-                    <span>{formatIdentity(identity)}</span>
-                    <span>{primary ? formatIdentity(primary) : "-"}</span>
-                    <span className="status">Ready</span>
-                  </div>
-                ))
+              connectedIdentities.map((identity, index) => (
+                <div className="table-row" key={`${identity}-${index}`}>
+                  <span>{formatIdentity(identity)}</span>
+                  <span>{primary ? formatIdentity(primary) : "-"}</span>
+                  <span className="status">
+                    {index === 0 ? "Primary" : "Ready"}
+                  </span>
+                </div>
+              ))
             )}
           </div>
         </section>
