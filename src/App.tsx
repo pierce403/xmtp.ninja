@@ -34,28 +34,32 @@ export default function App() {
     () => [primary, ...secondaries].filter(Boolean),
     [primary, secondaries],
   );
+  const connectedIdentityCount = secondaries.length;
 
   const unifiedInbox = useMemo(() => {
     if (!primary) return "Load a primary inbox to view routing.";
     if (enumerationStatus === "enumerating") {
       return `Enumerating identities connected to ${formatIdentity(primary)}.`;
     }
-    const total = secondaries.length + 1;
-    return `${formatIdentity(primary)} receives ${total} identity${
-      total === 1 ? "" : "ies"
+    if (connectedIdentityCount === 0) {
+      return `${formatIdentity(primary)} is loaded with no connected identities yet.`;
+    }
+    return `${formatIdentity(primary)} receives ${connectedIdentityCount} connected identit${
+      connectedIdentityCount === 1 ? "y" : "ies"
     }.`;
-  }, [enumerationStatus, primary, secondaries]);
+  }, [connectedIdentityCount, enumerationStatus, primary]);
 
   const enumerationCopy = useMemo(() => {
     if (!primary) return "Waiting for primary inbox.";
     if (enumerationStatus === "enumerating") return "Enumerating identities.";
     if (enumerationStatus === "complete") {
-      return `${connectedIdentities.length} connected identit${
-        connectedIdentities.length === 1 ? "y" : "ies"
+      if (connectedIdentityCount === 0) return "No connected identities found.";
+      return `${connectedIdentityCount} connected identit${
+        connectedIdentityCount === 1 ? "y" : "ies"
       } loaded.`;
     }
     return "Primary inbox ready to load.";
-  }, [connectedIdentities.length, enumerationStatus, primary]);
+  }, [connectedIdentityCount, enumerationStatus, primary]);
 
   const enumerateConnectedIdentities = (target: string, instant = false) => {
     const runId = enumerationRunRef.current + 1;
@@ -75,7 +79,9 @@ export default function App() {
       setEnumerationStatus("complete");
       setNote(
         discovered.length > 0
-          ? `Loaded ${discovered.length + 1} connected identities.`
+          ? `Loaded ${discovered.length} connected identit${
+              discovered.length === 1 ? "y" : "ies"
+            }.`
           : "Primary inbox loaded. No additional connected identities were discovered yet.",
       );
     }, delay);
@@ -199,7 +205,7 @@ export default function App() {
               </div>
               <div>
                 <p className="stat-label">Connected</p>
-                <p className="stat-value">{connectedIdentities.length}</p>
+                <p className="stat-value">{connectedIdentityCount}</p>
               </div>
               <div>
                 <p className="stat-label">Enumeration</p>
