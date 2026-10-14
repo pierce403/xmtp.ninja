@@ -14,4 +14,4 @@
 
 ## Delivery
 - [ ] Add GitHub Pages deploy workflow.
-- [ ] Add basic analytics or telemetry (privacy-preserving).
+- [x] Add privacy-preserving Cloudflare Web Analytics with received visits and zone request/status metrics (2026-10-14).
