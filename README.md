@@ -38,3 +38,11 @@ GitHub Pages subdirectory without additional configuration.
 ## Roadmap
 
 See `TODO.md` for the next milestones.
+
+## Cloudflare hosting
+
+Native Git publishes `main` with `npm run build:cloudflare` and `npm run deploy`.
+The original generator and GitHub Pages build remain available for recovery.
+Cloudflare-only postprocessing adds a no-store revision marker and terminal404;
+previews are disabled and deployment credentials stay in Cloudflare.
+Application source, local data formats and existing public URLs are preserved.
