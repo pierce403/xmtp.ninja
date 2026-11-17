@@ -51,3 +51,8 @@ October14Cloudflare hosting acceptance passed: exact native route build/version,
 managed HTTPS, all generated asset comparisons, real404, browser rendering,
 received visits and request/status metrics. Existing local data was not reset.
 Hosting acceptance does not expand wallet, messaging, hardware or PWA-device claims.
+
+## Licensing scope
+
+Original code and documentation authored for this project by Dean Pierce are licensed under the [Apache License 2.0](LICENSE).
+Third-party dependencies, assets, and quoted material retain their respective licenses and notices. This grant does not relicense third-party work.
